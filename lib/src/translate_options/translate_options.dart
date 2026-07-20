@@ -26,9 +26,10 @@ enum Model {
   gemini25Pro('gemini-2.5-pro', 'Gemini 2.5 Pro'),
   gemini25Flash('gemini-2.5-flash', 'Gemini 2.5 Flash'),
   gemini25FlashLite('gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite'),
-  gemini3Flash('gemini-3-flash-preview', 'Gemini 3 Flash'),
-  gemini31Pro('gemini-3.1-pro-preview', 'Gemini 3.1 Pro'),
-  gemini31FlashLite('gemini-3.1-flash-lite-preview', 'Gemini 3.1 Flash-Lite'),
+  gemini3Flash('gemini-3-flash-preview', 'Gemini 3 Flash Preview'),
+  gemini31Pro('gemini-3.1-pro-preview', 'Gemini 3.1 Pro Preview'),
+  gemini31FlashLite('gemini-3.1-flash-lite', 'Gemini 3.1 Flash-Lite'),
+  gemini35Flash('gemini-3.5-flash', 'Gemini 3.5 Flash'),
   gpt35Turbo('gpt-3.5-turbo', 'GPT-3.5 Turbo'),
   gpt4('gpt-4', 'GPT-4'),
   gpt4Turbo('gpt-4-turbo', 'GPT-4 Turbo'),
@@ -57,6 +58,7 @@ enum Model {
     Model.gemini3Flash,
     Model.gemini31Pro,
     Model.gemini31FlashLite,
+    Model.gemini35Flash,
   };
 
   /// Returns a set of GPT models.
@@ -139,7 +141,7 @@ class TranslateOptions {
         yamlResults.model ??
         (modelProvider == ModelProvider.openAi
             ? Model.gpt35Turbo
-            : Model.gemini25Flash);
+            : Model.gemini31FlashLite);
     final customModel = argResults.customModel ?? yamlResults.customModel;
 
     if (modelProvider != ModelProvider.customOpenAiCompatible) {

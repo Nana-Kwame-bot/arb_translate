@@ -1,3 +1,8 @@
+## Unreleased
+- Added Gemini-3.5-flash and the GA Gemini-3.1-flash-lite model
+- Replaced the shut down Gemini-3.1-flash-lite-preview endpoint
+- Updated the default Gemini model to Gemini-3.1-flash-lite
+
 ## 1.3.1
 - Added Gemini-3-flash-preview, Gemini-3.1-pro-preview, and Gemini-3.1-flash-lite-preview support
 - Updated README.md

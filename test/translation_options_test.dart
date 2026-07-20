@@ -1,4 +1,5 @@
 import 'package:arb_translate/arb_translate.dart';
+import 'package:arb_translate/src/translation_delegates/gemini_translation_delegate.dart';
 import 'package:file/memory.dart';
 import 'package:test/test.dart';
 
@@ -129,5 +130,58 @@ void main() {
         );
       },
     );
+
+    test('supports all GA Gemini 3.x text tiers', () {
+      final parser = TranslateArgParser();
+
+      for (final modelId in [
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
+      ]) {
+        final model = parser.parse(['--model', modelId]).model!;
+
+        expect(model.key, modelId);
+        expect(
+          () => GeminiTranslationDelegate(
+            model: model,
+            apiKey: 'apiKey',
+            batchSize: 4096,
+            context: null,
+            disableSafety: false,
+            useEscaping: false,
+            relaxSyntax: false,
+          ),
+          returnsNormally,
+        );
+        expect(
+          () => GeminiTranslationDelegate.vertexAi(
+            model: model,
+            apiKey: 'apiKey',
+            projectUrl: Uri.parse('https://example.com/models'),
+            batchSize: 4096,
+            context: null,
+            disableSafety: false,
+            useEscaping: false,
+            relaxSyntax: false,
+          ),
+          returnsNormally,
+        );
+      }
+
+      expect(
+        Model.geminiModels.map((model) => model.key),
+        isNot(contains('gemini-3.1-flash-lite-preview')),
+      );
+    });
+
+    test('defaults to the latest Gemini Flash-Lite model', () {
+      final options = TranslateOptions.resolve(
+        MemoryFileSystem(),
+        TranslateArgParser().parse(['--api-key', 'apiKey']),
+        const TranslateYamlResults.empty(),
+      );
+
+      expect(options.model.key, 'gemini-3.1-flash-lite');
+    });
   });
 }

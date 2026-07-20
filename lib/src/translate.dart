@@ -18,6 +18,12 @@ import 'package:file/file.dart';
 /// The [options] parameter contains the translation options, including the
 /// model provider, API key, context, safety settings, and more.
 Future<void> translate(FileSystem fileSystem, TranslateOptions options) async {
+  final model = switch (options.modelProvider) {
+    ModelProvider.customOpenAiCompatible => options.customModel!,
+    _ => options.model.key,
+  };
+  print('Using model: $model');
+
   final translationDelegate = switch (options.modelProvider) {
     ModelProvider.gemini => GeminiTranslationDelegate(
       model: options.model,
