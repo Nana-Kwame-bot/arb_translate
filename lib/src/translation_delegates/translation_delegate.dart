@@ -4,10 +4,15 @@ import 'package:arb_translate/src/flutter_tools/fakes/fake_app_resource_bundle.d
 import 'package:arb_translate/src/flutter_tools/fakes/fake_app_resource_bundle_collection.dart';
 import 'package:arb_translate/src/flutter_tools/gen_l10n_types.dart';
 import 'package:arb_translate/src/flutter_tools/localizations_utils.dart';
+import 'package:arb_translate/src/flutter_tools/message_parser.dart';
 import 'package:arb_translate/src/translation_delegates/translate_exception.dart';
 import 'package:meta/meta.dart';
 
 abstract class TranslationDelegate {
+  static final _icuControlExpressionStart = RegExp(
+    r'\{\s*[a-zA-Z0-9|_]+\s*,\s*(?:plural|select|date|time)\b',
+  );
+
   const TranslationDelegate({
     required this.batchSize,
     required this.context,
@@ -126,7 +131,9 @@ abstract class TranslationDelegate {
         continue;
       }
 
-      if (!validateResults(resources, result)) {
+      final validationFailure = _validateResults(resources, result);
+
+      if (validationFailure != null) {
         retryCount++;
 
         print(
@@ -135,7 +142,11 @@ abstract class TranslationDelegate {
         );
 
         if (retryCount > maxRetryCount) {
-          throw PlaceholderValidationException();
+          throw PlaceholderValidationException(
+            locale: locale.toString(),
+            messageKey: validationFailure.messageKey,
+            details: validationFailure.details,
+          );
         }
 
         continue;
@@ -191,6 +202,12 @@ abstract class TranslationDelegate {
   bool validateResults(
     Map<String, Object?> resources,
     Map<String, String> results,
+  ) =>
+      _validateResults(resources, results) == null;
+
+  _PlaceholderValidationFailure? _validateResults(
+    Map<String, Object?> resources,
+    Map<String, String> results,
   ) {
     final templateBundle = FakeAppResourcesBundle(resources, true);
     final otherBundle = FakeAppResourcesBundle(results, false);
@@ -210,13 +227,184 @@ abstract class TranslationDelegate {
         );
 
         if (message.hadErrors) {
-          return false;
+          return _PlaceholderValidationFailure(messageKey: key);
+        }
+
+        final templatePlaceholders = _declaredPlaceholders(resources, key)
+          ..addAll(
+            _parsedPlaceholders(
+              message.parsedMessages[templateBundle.locale],
+            ),
+          );
+        final translatedPlaceholders = _parsedPlaceholders(
+          message.parsedMessages[otherBundle.locale],
+        );
+
+        if (relaxSyntax) {
+          translatedPlaceholders.addAll(
+            _relaxedControlPlaceholders(
+              key,
+              otherBundle.file.basename,
+              results[key]!,
+            ),
+          );
+        }
+
+        final missingPlaceholders = templatePlaceholders
+            .difference(translatedPlaceholders)
+            .toList()
+          ..sort();
+        final unexpectedPlaceholders = translatedPlaceholders
+            .difference(templatePlaceholders)
+            .toList()
+          ..sort();
+
+        if (missingPlaceholders.isNotEmpty ||
+            unexpectedPlaceholders.isNotEmpty) {
+          return _PlaceholderValidationFailure(
+            messageKey: key,
+            missingPlaceholders: missingPlaceholders,
+            unexpectedPlaceholders: unexpectedPlaceholders,
+          );
         }
       } catch (e) {
-        return false;
+        return _PlaceholderValidationFailure(messageKey: key);
       }
     }
 
-    return true;
+    return null;
+  }
+
+  Set<String> _declaredPlaceholders(
+    Map<String, Object?> resources,
+    String key,
+  ) {
+    final attributes = resources['@$key'];
+
+    if (attributes is! Map<String, Object?>) {
+      return <String>{};
+    }
+
+    final placeholders = attributes['placeholders'];
+
+    if (placeholders is! Map<String, Object?>) {
+      return <String>{};
+    }
+
+    return placeholders.keys.toSet();
+  }
+
+  Set<String> _parsedPlaceholders(
+    Node? root, {
+    bool includeSimplePlaceholders = true,
+  }) {
+    if (root == null) {
+      return <String>{};
+    }
+
+    final placeholders = <String>{};
+    final traversalStack = <Node>[root];
+
+    while (traversalStack.isNotEmpty) {
+      final node = traversalStack.removeLast();
+
+      if ((includeSimplePlaceholders && node.type == ST.placeholderExpr) ||
+          <ST>{
+            ST.pluralExpr,
+            ST.selectExpr,
+            ST.argumentExpr,
+          }.contains(node.type)) {
+        placeholders.add(node.children[1].value!);
+      }
+
+      traversalStack.addAll(node.children);
+    }
+
+    return placeholders;
+  }
+
+  Set<String> _relaxedControlPlaceholders(
+    String key,
+    String filename,
+    String message,
+  ) {
+    final placeholders = <String>{};
+
+    for (final match in _icuControlExpressionStart.allMatches(message)) {
+      if (useEscaping && _isWithinQuotedString(message, match.start)) {
+        continue;
+      }
+
+      var end = message.indexOf('}', match.end);
+
+      while (end != -1) {
+        try {
+          placeholders.addAll(
+            _parsedPlaceholders(
+              Parser(
+                key,
+                filename,
+                message.substring(match.start, end + 1),
+                useEscaping: useEscaping,
+              ).parse(),
+              includeSimplePlaceholders: false,
+            ),
+          );
+          break;
+        } on L10nException catch (_) {
+          end = message.indexOf('}', end + 1);
+        }
+      }
+    }
+
+    return placeholders;
+  }
+
+  bool _isWithinQuotedString(String message, int position) {
+    var isQuoted = false;
+
+    for (var index = 0; index < position; index++) {
+      if (message[index] != "'") {
+        continue;
+      }
+
+      if (index + 1 < position && message[index + 1] == "'") {
+        index++;
+      } else {
+        isQuoted = !isQuoted;
+      }
+    }
+
+    return isQuoted;
+  }
+}
+
+class _PlaceholderValidationFailure {
+  const _PlaceholderValidationFailure({
+    required this.messageKey,
+    this.missingPlaceholders = const [],
+    this.unexpectedPlaceholders = const [],
+  });
+
+  final String messageKey;
+  final List<String> missingPlaceholders;
+  final List<String> unexpectedPlaceholders;
+
+  String? get details {
+    final failures = <String>[
+      if (missingPlaceholders.isNotEmpty)
+        'missing ${_describePlaceholders(missingPlaceholders)}',
+      if (unexpectedPlaceholders.isNotEmpty)
+        'unexpected ${_describePlaceholders(unexpectedPlaceholders)}',
+    ];
+
+    return failures.isEmpty ? null : failures.join('; ');
+  }
+
+  String _describePlaceholders(List<String> placeholders) {
+    final label = placeholders.length == 1 ? 'placeholder' : 'placeholders';
+    final names = placeholders.map((name) => '"$name"').join(', ');
+
+    return '$label $names';
   }
 }

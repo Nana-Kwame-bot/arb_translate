@@ -38,6 +38,23 @@ class ResponseParsingException implements TranslateException {
 }
 
 class PlaceholderValidationException implements TranslateException {
+  const PlaceholderValidationException({
+    this.locale,
+    this.messageKey,
+    this.details,
+  });
+
+  final String? locale;
+  final String? messageKey;
+  final String? details;
+
   @override
-  String get message => 'Placeholder validation failed';
+  String get message {
+    if (locale == null || messageKey == null) {
+      return 'Placeholder validation failed';
+    }
+
+    return 'Placeholder validation failed for locale "$locale", message '
+        '"$messageKey"${details == null ? '' : ': $details'}';
+  }
 }
