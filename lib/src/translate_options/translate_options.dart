@@ -31,6 +31,7 @@ enum Model {
   gemini31FlashLite('gemini-3.1-flash-lite', 'Gemini 3.1 Flash-Lite'),
   gemini35Flash('gemini-3.5-flash', 'Gemini 3.5 Flash'),
   gemini36Flash('gemini-3.6-flash', 'Gemini 3.6 Flash'),
+  gemini38Flash('gemini-3.8-flash', 'Gemini 3.8 Flash'),
   gpt35Turbo('gpt-3.5-turbo', 'GPT-3.5 Turbo'),
   gpt4('gpt-4', 'GPT-4'),
   gpt4Turbo('gpt-4-turbo', 'GPT-4 Turbo'),
@@ -61,6 +62,7 @@ enum Model {
     Model.gemini31FlashLite,
     Model.gemini35Flash,
     Model.gemini36Flash,
+    Model.gemini38Flash,
   };
 
   /// Returns a set of GPT models.

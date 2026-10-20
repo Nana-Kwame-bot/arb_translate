@@ -135,6 +135,7 @@ void main() {
       final parser = TranslateArgParser();
 
       for (final modelId in [
+        'gemini-3.8-flash',
         'gemini-3.6-flash',
         'gemini-3.5-flash',
         'gemini-3.1-flash-lite',
